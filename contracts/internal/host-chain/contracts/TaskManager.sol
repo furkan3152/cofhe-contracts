@@ -39,6 +39,11 @@ error OnDenyList(address caller);
 // Operation-specific errors
 error RandomFunctionNotSupported();
 error DecryptFunctionNotSupported();
+error FunctionNotSupported(uint8 funcId);
+
+/// @dev Bit i set = FunctionId i is a task createTask accepts: cast, select, sub..trivialEncrypt,
+///      rol, ror, square. decrypt and random are rejected earlier with their own errors.
+uint256 constant SUPPORTED_TASK_FUNCTIONS = 0x77ffff94;
 
 library TMCommon {
     uint256 private constant HASH_MASK_FOR_METADATA  = type(uint256).max - type(uint16).max; // 2 bytes reserved for metadata
@@ -705,6 +710,12 @@ contract TaskManager is ITaskManager, Initializable, UUPSUpgradeable, AccessCont
 
         if (funcId == FunctionId.decrypt) {
             revert DecryptFunctionNotSupported();
+        }
+
+        // The remaining FunctionId members (_0, _1, sealoutput, _5, _31) are not FHE task
+        // operations either: the coprocessor has nothing to run, so the placeholder would strand.
+        if ((SUPPORTED_TASK_FUNCTIONS >> uint8(funcId)) & 1 == 0) {
+            revert FunctionNotSupported(uint8(funcId));
         }
 
         if (!isValidType(returnType)) {
